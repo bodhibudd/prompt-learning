@@ -1,13 +1,12 @@
-import os, sys, logging
-from transformers import Trainer, BertTokenizer, BertForMaskedLM, TrainingArguments,EarlyStoppingCallback
+import os, sys
+from transformers import Trainer, BertTokenizer, BertForMaskedLM, TrainingArguments
 import torch
 from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import pandas as pd
-import jieba
+
 bert_model_path = "data/models/"
-#可以进行扩展映射关系，比如好，美，可等，这里简单定义两个
+#可以扩展映射关系，比如好，美，可等，这里简单定义两个
 ids2label = {"1":"好", "0":"差"}
 
 train_path = os.path.join("data", "train_data.csv")
@@ -35,8 +34,7 @@ class ClassifyDataset(Dataset):
             return (self.datas[idx], self.labels[idx])
 
 def default_collate_fn(examples):
-    #数据进行长度统一
-    #1表示训练与验证 1表示测试
+    #2表示训练与验证
     texts = []
     labels = []
     if len(examples[0]) == 2:
@@ -90,7 +88,7 @@ def train():
     train_dataset = ClassifyDataset(t_texts, max_len=512, labels=t_labels)
     d_texts, d_labels = get_datas(df_dev)
     dev_dataset = ClassifyDataset(d_texts, max_len=512, labels=d_labels)
-    args = TrainingArguments(output_dir="output/", evaluation_strategy="steps",
+    args = TrainingArguments(output_dir="output/",
                              overwrite_output_dir=True,
                              num_train_epochs=2,
                              per_device_train_batch_size=4,
@@ -105,10 +103,12 @@ def train():
     trainer.train()
     trainer.save_model(f'output/models')
 def evaluate():
+    # 只设计了单个评价映射词好与差，正常需要多设计几个词，比如正面评价["好","美","行"]等。这里只是直接判断分类的结果是好还是差
     model_path = "output/models/"
     d_texts, d_labels = get_datas(df_dev)
     dev_dataset = ClassifyDataset(d_texts, max_len=512, labels=d_labels)
     model = BertForMaskedLM.from_pretrained(model_path)
+    model.eval()
     total = 0
 
     for i, batch in tqdm(enumerate(get_dataloader(default_collate_fn, dev_dataset, 4))):
